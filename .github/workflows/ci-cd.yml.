@@ -1,4 +1,5 @@
 name: CI/CD Pipeline
+
 on:
   push:
     branches: [ "main" ]
@@ -19,6 +20,7 @@ jobs:
         run: az acr login --name hzvonenko
 
       - name: Build and Push Images
+        # Пункт 2 і 3: Збираємо ТІЛЬКИ vote, result, worker і ставимо тег :latest
         run: |
           for service in vote result worker; do
             docker build -t hzvonenko.azurecr.io/$service:latest ./$service
@@ -32,15 +34,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Prepare docker-compose
+      - name: Edit docker-compose.yml
+        # Пункт 4: Замінюємо build на image для наших сервісів, redis та db не чіпаємо
         run: |
           sed -i 's/build: .\/vote/image: hzvonenko.azurecr.io\/vote:latest/' docker-compose.yml
           sed -i 's/build: .\/result/image: hzvonenko.azurecr.io\/result:latest/' docker-compose.yml
           sed -i 's/build: .\/worker/image: hzvonenko.azurecr.io\/worker:latest/' docker-compose.yml
-          # Видаляємо зайві рядки build, якщо вони залишилися
-          sed -i '/build:/d' docker-compose.yml
 
       - name: Deploy to VM via SSH
+        # Пункт 5: Копіюємо файл на VM та робимо деплой
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.VM_IP }}
@@ -48,8 +50,10 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd ~
-            echo "${{ steps.prepare.outputs.compose_content }}" > docker-compose.yml
-            # (Або просто скопіюйте файл)
+            # Отримуємо оновлений docker-compose.yml (можна через cat або scp)
+            # Для простоти в цьому скрипті припустимо, що ви копіюєте вміст:
+            echo "${{ steps.edit.outputs.new_compose }}" > docker-compose.yml 
+            
             sudo docker login hzvonenko.azurecr.io -u ${{ secrets.ACR_USERNAME }} -p ${{ secrets.ACR_PASSWORD }}
             sudo docker compose pull
             sudo docker compose up -d --remove-orphans
