@@ -1,0 +1,27 @@
+name: CI/CD to ACR and VM
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Login to ACR
+        run: az acr login --name hzvonenko
+
+      - name: Build and Push Services
+        run: |
+          for service in vote result worker; do
+            docker build -t hzvonenko.azurecr.io/$service:latest ./$service
+            docker push hzvonenko.azurecr.io/$service:latest
+          done
