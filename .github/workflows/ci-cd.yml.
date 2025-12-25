@@ -1,4 +1,4 @@
-name: CI/CD to ACR and VM
+name: CI/CD Pipeline
 
 on:
   push:
@@ -16,12 +16,41 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Login to ACR
+      - name: ACR Login
         run: az acr login --name hzvonenko
 
-      - name: Build and Push Services
+      - name: Build and Push Images
         run: |
           for service in vote result worker; do
             docker build -t hzvonenko.azurecr.io/$service:latest ./$service
             docker push hzvonenko.azurecr.io/$service:latest
           done
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Prepare docker-compose
+        run: |
+          sed -i 's/build: .\/vote/image: hzvonenko.azurecr.io\/vote:latest/' docker-compose.yml
+          sed -i 's/build: .\/result/image: hzvonenko.azurecr.io\/result:latest/' docker-compose.yml
+          sed -i 's/build: .\/worker/image: hzvonenko.azurecr.io\/worker:latest/' docker-compose.yml
+          # Видаляємо зайві рядки build, якщо вони залишилися
+          sed -i '/build:/d' docker-compose.yml
+
+      - name: Deploy to VM via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VM_IP }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd ~
+            echo "${{ steps.prepare.outputs.compose_content }}" > docker-compose.yml
+            # (Або просто скопіюйте файл)
+            sudo docker login hzvonenko.azurecr.io -u ${{ secrets.ACR_USERNAME }} -p ${{ secrets.ACR_PASSWORD }}
+            sudo docker compose pull
+            sudo docker compose up -d --remove-orphans
