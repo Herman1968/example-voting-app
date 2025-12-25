@@ -25,3 +25,4 @@ jobs:
             docker build -t hzvonenko.azurecr.io/$service:latest ./$service
             docker push hzvonenko.azurecr.io/$service:latest
           done
+
