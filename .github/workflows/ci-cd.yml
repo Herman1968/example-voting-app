@@ -5,40 +5,32 @@ on:
     branches:
       - main
 
-env:
-  # Ім'я ACR з GitHub Secret
-  ACR: ${{ secrets.AZURE_ACR_NAME }}
-  # SSH доступ до VM
-  VM_HOST: ${{ secrets.VM_HOST }}
-  VM_USER: ${{ secrets.VM_USER }}
-  SSH_KEY: ${{ secrets.SSH_KEY }}
-
 jobs:
   build-push-deploy:
     runs-on: ubuntu-latest
+    env:
+      ACR: ${{ secrets.AZURE_ACR_NAME }}
+      VM_HOST: ${{ secrets.VM_HOST }}
+      VM_USER: ${{ secrets.VM_USER }}
+      SSH_KEY: ${{ secrets.SSH_KEY }}
 
     steps:
-    # ----------------- Checkout -----------------
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # ----------------- Azure Login -----------------
     - name: Azure Login
       uses: azure/login@v2
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-    # ----------------- Login to ACR -----------------
     - name: Login to ACR
       run: az acr login --name $ACR
 
-    # ----------------- Check Docker -----------------
     - name: Check Docker
       run: |
         docker --version
         docker compose version
 
-    # ----------------- Build & Push Images -----------------
     - name: Build & Push vote
       run: |
         docker build -t $ACR/vote:latest ./vote
@@ -54,14 +46,12 @@ jobs:
         docker build -t $ACR/worker:latest ./worker
         docker push $ACR/worker:latest
 
-    # ----------------- Update docker-compose.yml -----------------
     - name: Update docker-compose.yml
       run: |
         sed -i 's|build: ./vote|image: '"$ACR"'/vote:latest|' docker-compose.yml
         sed -i 's|build: ./result|image: '"$ACR"'/result:latest|' docker-compose.yml
         sed -i 's|build: ./worker|image: '"$ACR"'/worker:latest|' docker-compose.yml
 
-    # ----------------- Deploy to VM -----------------
     - name: Deploy to VM
       uses: appleboy/ssh-action@v0.1.7
       with:
@@ -70,4 +60,6 @@ jobs:
         key: ${{ env.SSH_KEY }}
         port: 22
         script: |
-          cd /home/${{ env.VM_USER }}/_
+          cd /home/${{ env.VM_USER }}/voting-app
+          docker compose pull
+          docker compose up -d --remove-orphans
