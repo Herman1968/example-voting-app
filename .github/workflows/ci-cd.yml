@@ -19,67 +19,59 @@ jobs:
       SUBSCRIPTION_ID: 638093c7-cf1d-450c-b99c-db37d473e327
 
     steps:
-    # ----------------- Checkout repository -----------------
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    # ----------------- Azure Login on runner -----------------
-    - name: Azure Login
-      uses: azure/login@v2
-      with:
-        creds: |
-          {
-            "clientId": "${{ env.ACR_SP_ID }}",
-            "clientSecret": "${{ env.ACR_SP_PASSWORD }}",
-            "subscriptionId": "${{ env.SUBSCRIPTION_ID }}",
-            "tenantId": "${{ env.TENANT_ID }}"
-          }
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: |
+            {
+              "clientId": "${{ env.ACR_SP_ID }}",
+              "clientSecret": "${{ env.ACR_SP_PASSWORD }}",
+              "subscriptionId": "${{ env.SUBSCRIPTION_ID }}",
+              "tenantId": "${{ env.TENANT_ID }}"
+            }
 
-    # ----------------- Login to ACR from runner -----------------
-    - name: Login to ACR
-      run: az acr login --name $ACR
+      - name: Login to ACR
+        run: az acr login --name $ACR
 
-    # ----------------- Check Docker -----------------
-    - name: Check Docker
-      run: docker --version
+      - name: Check Docker
+        run: docker --version
 
-    # ----------------- Build & Push Images -----------------
-    - name: Build & Push vote
-      run: |
-        docker build -t $ACR/vote:latest ./vote
-        docker push $ACR/vote:latest
+      - name: Build & Push vote
+        run: |
+          docker build -t $ACR/vote:latest ./vote
+          docker push $ACR/vote:latest
 
-    - name: Build & Push result
-      run: |
-        docker build -t $ACR/result:latest ./result
-        docker push $ACR/result:latest
+      - name: Build & Push result
+        run: |
+          docker build -t $ACR/result:latest ./result
+          docker push $ACR/result:latest
 
-    - name: Build & Push worker
-      run: |
-        docker build -t $ACR/worker:latest ./worker
-        docker push $ACR/worker:latest
+      - name: Build & Push worker
+        run: |
+          docker build -t $ACR/worker:latest ./worker
+          docker push $ACR/worker:latest
 
-    # ----------------- Update docker-compose.yml -----------------
-    - name: Update docker-compose.yml
-      run: |
-        sed -i 's|build: ./vote|image: '"$ACR"'/vote:latest|' docker-compose.yml
-        sed -i 's|build: ./result|image: '"$ACR"'/result:latest|' docker-compose.yml
-        sed -i 's|build: ./worker|image: '"$ACR"'/worker:latest|' docker-compose.yml
+      - name: Update docker-compose.yml
+        run: |
+          sed -i 's|build: ./vote|image: '"$ACR"'/vote:latest|' docker-compose.yml
+          sed -i 's|build: ./result|image: '"$ACR"'/result:latest|' docker-compose.yml
+          sed -i 's|build: ./worker|image: '"$ACR"'/worker:latest|' docker-compose.yml
 
-    # ----------------- Create temporary SSH key -----------------
-    - name: Create temporary SSH key
-      run: |
-        echo "${SSH_KEY}" > ./temp_key.pem
-        chmod 600 ./temp_key.pem
+      - name: Create temporary SSH key
+        run: |
+          echo "${SSH_KEY}" > ./temp_key.pem
+          chmod 600 ./temp_key.pem
 
-    # ----------------- Login to ACR on VM non-interactive -----------------
-    - name: Login to ACR on VM
-      uses: appleboy/ssh-action@v1
-      with:
-        host: ${{ env.VM_HOST }}
-        username: ${{ env.VM_USER }}
-        key: ./temp_key.pem
-        port: 22
+      - name: Login to ACR on VM
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ env.VM_HOST }}
+          username: ${{ env.VM_USER }}
+          key: ./temp_key.pem
+          port: 22
         env:
           ACR_SP_ID: ${{ env.ACR_SP_ID }}
           ACR_SP_PASSWORD: ${{ env.ACR_SP_PASSWORD }}
@@ -90,19 +82,17 @@ jobs:
           az login --service-principal -u $ACR_SP_ID -p $ACR_SP_PASSWORD --tenant $TENANT_ID
           az acr login --name $ACR
 
-    # ----------------- Copy project to VM -----------------
-    - name: Copy project to VM
-      run: |
-        scp -o StrictHostKeyChecking=no -i ./temp_key.pem -r ./ ${{ env.VM_USER }}@${{ env.VM_HOST }}:/home/${{ env.VM_USER }}/voting-app/
+      - name: Copy project to VM
+        run: |
+          scp -o StrictHostKeyChecking=no -i ./temp_key.pem -r ./ ${{ env.VM_USER }}@${{ env.VM_HOST }}:/home/${{ env.VM_USER }}/voting-app/
 
-    # ----------------- Deploy to VM ----------------
-    - name: Deploy to VM
-      uses: appleboy/ssh-action@v1
-      with:
-        host: ${{ env.VM_HOST }}
-        username: ${{ env.VM_USER }}
-        key: ./temp_key.pem
-        port: 22
+      - name: Deploy to VM
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ env.VM_HOST }}
+          username: ${{ env.VM_USER }}
+          key: ./temp_key.pem
+          port: 22
         env:
           ACR: ${{ env.ACR }}
         script: |
