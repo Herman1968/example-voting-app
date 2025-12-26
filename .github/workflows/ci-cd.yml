@@ -11,20 +11,21 @@ jobs:
     env:
       ACR: hzvonenko.azurecr.io
       VM_HOST: 4.232.191.99
-      VM_USER: azureuser               # <-- укажи своего пользователя для SSH
+      VM_USER: azureuser
       SSH_KEY: ${{ secrets.SSH_KEY }}
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    # ----------------- Azure Login -----------------
     - name: Azure Login
       uses: azure/login@v2
       with:
         creds: |
           {
-            "clientId": "452a286e-8373-4a75-9e6a-ec23a99c889f",
-            "clientSecret": "dsg8Q~biF5RV-QyCVuJTO_AYHD2WJKgg8jKdJbZY",
+            "clientId": "40877cd6-b56b-4ec3-9c52-7e3f41153d16",
+            "clientSecret": "gHH8Q~Tbq3bIZync7KnIpopPWlW14FCWLZpUIa78",
             "subscriptionId": "638093c7-cf1d-450c-b99c-db37d473e327",
             "tenantId": "97e4daac-f316-487e-99fc-9385224046d9",
             "activeDirectoryEndpointUrl": "https://login.microsoftonline.com",
@@ -35,14 +36,17 @@ jobs:
             "managementEndpointUrl": "https://management.core.windows.net/"
           }
 
+    # ----------------- Login to ACR -----------------
     - name: Login to ACR
       run: az acr login --name $ACR
 
+    # ----------------- Check Docker -----------------
     - name: Check Docker
       run: |
         docker --version
         docker compose version
 
+    # ----------------- Build & Push Images -----------------
     - name: Build & Push vote
       run: |
         docker build -t $ACR/vote:latest ./vote
@@ -58,12 +62,14 @@ jobs:
         docker build -t $ACR/worker:latest ./worker
         docker push $ACR/worker:latest
 
+    # ----------------- Update docker-compose.yml -----------------
     - name: Update docker-compose.yml
       run: |
         sed -i 's|build: ./vote|image: '"$ACR"'/vote:latest|' docker-compose.yml
         sed -i 's|build: ./result|image: '"$ACR"'/result:latest|' docker-compose.yml
         sed -i 's|build: ./worker|image: '"$ACR"'/worker:latest|' docker-compose.yml
 
+    # ----------------- Deploy to VM -----------------
     - name: Deploy to VM
       uses: appleboy/ssh-action@v0.1.7
       with:
