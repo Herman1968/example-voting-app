@@ -72,15 +72,10 @@ jobs:
           username: ${{ env.VM_USER }}
           key: ./temp_key.pem
           port: 22
-        env:
-          ACR_SP_ID: ${{ env.ACR_SP_ID }}
-          ACR_SP_PASSWORD: ${{ env.ACR_SP_PASSWORD }}
-          TENANT_ID: ${{ env.TENANT_ID }}
-          ACR: ${{ env.ACR }}
-        script: |
-          echo "Logging into Azure non-interactively"
-          az login --service-principal -u $ACR_SP_ID -p $ACR_SP_PASSWORD --tenant $TENANT_ID
-          az acr login --name $ACR
+          script: |
+            echo "Logging into Azure non-interactively"
+            az login --service-principal -u ${{ env.ACR_SP_ID }} -p ${{ env.ACR_SP_PASSWORD }} --tenant ${{ env.TENANT_ID }}
+            az acr login --name ${{ env.ACR }}
 
       - name: Copy project to VM
         run: |
@@ -93,9 +88,10 @@ jobs:
           username: ${{ env.VM_USER }}
           key: ./temp_key.pem
           port: 22
-        env:
-          ACR: ${{ env.ACR }}
-        script: |
-          cd /home/${{ env.VM_USER }}/voting-app
-          docker-compose pull
-          docker-compose up -d --remove-orphans
+          script: |
+            cd /home/${{ env.VM_USER }}/voting-app
+            docker-compose pull
+            docker-compose up -d --remove-orphans
+
+      - name: Remove temporary SSH key
+        run: rm -f ./temp_key.pem
