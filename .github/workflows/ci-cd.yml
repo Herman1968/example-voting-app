@@ -12,7 +12,7 @@ jobs:
       ACR: hzvonenko.azurecr.io
       VM_HOST: 4.232.191.99
       VM_USER: azureuser
-      SSH_KEY: ${{ secrets.SSH_KEY }}
+      SSH_KEY: ${{ secrets.SSH_KEY_NEW }}
 
     steps:
     - name: Checkout repository
