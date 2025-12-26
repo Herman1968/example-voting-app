@@ -1,63 +1,48 @@
-name: CI/CD Pipeline
+name: CI-CD Voting App
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
+
+env:
+  ACR: ${{ secrets.ACR_LOGIN_SERVER }}
 
 jobs:
-  build-and-push:
+  build-push-deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: Azure Login
-        uses: azure/login@v1
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+    - name: Azure Login
+      uses: azure/login@v2
+      with:
+        client-id: ${{ secrets.AZURE_CLIENTES_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        client-secret: ${{ secrets.AZURE_CLIENTES_SECRET }}
 
-      - name: ACR Login
-        run: az acr login --name hzvonenko
+    - name: Login to ACR
+      run: az acr login --name $ACR
 
-      - name: Build and Push Images
-        # Пункти 2 та 3: Тільки vote, result, worker з тегом :latest
-        run: |
-          for service in vote result worker; do
-            docker build -t hzvonenko.azurecr.io/$service:latest ./$service
-            docker push hzvonenko.azurecr.io/$service:latest
-          done
+    # ---------- BUILD & PUSH ONLY 3 SERVICES ----------
+    - name: Build & Push vote
+      run: |
+        docker build -t $ACR/vote:latest ./vote
+        docker push $ACR/vote:latest
 
-  deploy:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Build & Push result
+      run: |
+        docker build -t $ACR/result:latest ./result
+        docker push $ACR/result:latest
 
-      - name: Prepare docker-compose.yml
-        # Пункт 4: Заміна build на image для ACR, redis та db не чіпаємо
-        run: |
-          sed -i 's/build: .\/vote/image: hzvonenko.azurecr.io\/vote:latest/' docker-compose.yml
-          sed -i 's/build: .\/result/image: hzvonenko.azurecr.io\/result:latest/' docker-compose.yml
-          sed -i 's/build: .\/worker/image: hzvonenko.azurecr.io\/worker:latest/' docker-compose.yml
+    - name: Build & Push worker
+      run: |
+        docker build -t $ACR/worker:latest ./worker
+        docker push $ACR/worker:latest
 
-      - name: Deploy to VM via SSH
-        # Пункт 5: Копіювання файлу та оновлення сервісів на VM
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.VM_IP }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            cd ~
-            # Створюємо або оновлюємо файл docker-compose.yml на VM
-            cat <<EOF > docker-compose.yml
-            $(cat docker-compose.yml)
-            EOF
-            
-            # Логін в ACR на самій VM (використовуємо ваш ACR_USERNAMES)
-            sudo docker login hzvonenko.azurecr.io -u ${{ secrets.ACR_USERNAMES }} -p ${{ secrets.ACR_PASSWORD }}
-            
-            # Оновлення контейнерів
-            sudo docker compose pull
-            sudo docker compose up -d --remove-orphans
+    # ---------- UPDATE docker-compose.yml ----------
+    - name: Update docker-compose.yml
+      run: |
+        sed -i 's|build: ./vote|image: '"$ACR"'/v
