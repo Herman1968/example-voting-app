@@ -78,14 +78,14 @@ jobs:
 
     # ----------------- Login to ACR on VM -----------------
     - name: Login to ACR on VM
-      uses: appleboy/ssh-action@v0.1.7
+      uses: appleboy/ssh-action@0.1.7
       with:
         host: ${{ env.VM_HOST }}
         username: ${{ env.VM_USER }}
         key: ./temp_key.pem
         port: 22
         script: |
-          echo "${ACR_SP_PASSWORD}" | docker login $ACR --username $ACR_SP_ID --password-stdin
+          docker login $ACR -u $ACR_SP_ID -p $ACR_SP_PASSWORD
 
     # ----------------- Copy project to VM -----------------
     - name: Copy project to VM
@@ -94,7 +94,7 @@ jobs:
 
     # ----------------- Deploy to VM -----------------
     - name: Deploy to VM
-      uses: appleboy/ssh-action@v0.1.7
+      uses: appleboy/ssh-action@0.1.7
       with:
         host: ${{ env.VM_HOST }}
         username: ${{ env.VM_USER }}
