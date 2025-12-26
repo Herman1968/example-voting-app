@@ -1,4 +1,4 @@
-name: CI-CD Pipeline
+name: CI/CD Pipeline
 
 on:
   push:
@@ -6,13 +6,13 @@ on:
       - main
 
 env:
-  # Azure Container Registry
-  ACR: hzvonenko.azurecr.io
-  # SSH доступ к VM
-  VM_HOST: 4.232.191.99
-  VM_USER: azureuser
+  # Имя ACR из GitHub Secret
+  ACR: ${{ secrets.AZURE_ACR_NAME }}
+  # SSH доступ до VM
+  VM_HOST: ${{ secrets.VM_HOST }}
+  VM_USER: ${{ secrets.VM_USER }}
   SSH_KEY: ${{ secrets.SSH_KEY_NEW }}
-  # Azure Service Principal для ACR
+  # Сервисный принципал ACR
   ACR_SP_ID: ${{ secrets.ACR_SP_ID }}
   ACR_SP_PASSWORD: ${{ secrets.ACR_SP_PASSWORD }}
 
@@ -29,18 +29,11 @@ jobs:
     - name: Azure Login
       uses: azure/login@v2
       with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
+        creds: ${{ secrets.AZURE_CREDENTIALSS }}
 
     # ----------------- Login to ACR -----------------
     - name: Login to ACR
-      run: |
-        echo "${ACR_SP_PASSWORD}" | docker login $ACR --username $ACR_SP_ID --password-stdin
-
-    # ----------------- Check Docker -----------------
-    - name: Check Docker
-      run: |
-        docker --version
-        docker compose version
+      run: echo "${ACR_SP_PASSWORD}" | docker login $ACR --username $ACR_SP_ID --password-stdin
 
     # ----------------- Build & Push Images -----------------
     - name: Build & Push vote
@@ -58,23 +51,15 @@ jobs:
         docker build -t $ACR/worker:latest ./worker
         docker push $ACR/worker:latest
 
-    # ----------------- Copy files to VM -----------------
-    - name: Copy project to VM
-      run: |
-        # Создаем директорию на VM
-        ssh -i $SSH_KEY -o StrictHostKeyChecking=no $VM_USER@$VM_HOST "mkdir -p /home/$VM_USER/voting-app"
-        
-        # Копируем только нужные папки и файлы (без .git)
-        scp -i $SSH_KEY -o StrictHostKeyChecking=no \
-          ./docker-compose.yml \
-          -r ./vote ./result ./worker \
-          $VM_USER@$VM_HOST:/home/$VM_USER/voting-app/
-
-    # ----------------- Deploy on VM -----------------
-    - name: Deploy on VM
-      run: |
-        ssh -i $SSH_KEY -o StrictHostKeyChecking=no $VM_USER@$VM_HOST "
-          cd /home/$VM_USER/voting-app
+    # ----------------- Deploy to VM -----------------
+    - name: Deploy to VM
+      uses: appleboy/ssh-action@v1
+      with:
+        host: ${{ env.VM_HOST }}
+        username: ${{ env.VM_USER }}
+        key: ${{ env.SSH_KEY }}
+        port: 22
+        script: |
+          cd /home/${{ env.VM_USER }}/voting-app
           docker compose pull
           docker compose up -d --remove-orphans
-        "
