@@ -68,10 +68,16 @@ jobs:
         sed -i 's|build: ./result|image: '"$ACR"'/result:latest|' docker-compose.yml
         sed -i 's|build: ./worker|image: '"$ACR"'/worker:latest|' docker-compose.yml
 
+    # ----------------- Create temporary SSH key file -----------------
+    - name: Create temporary SSH key
+      run: |
+        echo "${SSH_KEY}" > ./temp_key.pem
+        chmod 600 ./temp_key.pem
+
     # ----------------- Copy project to VM -----------------
     - name: Copy project to VM
       run: |
-        scp -o StrictHostKeyChecking=no -i ${{ env.SSH_KEY }} -r ./ ${{ env.VM_USER }}@${{ env.VM_HOST }}:/home/${{ env.VM_USER }}/voting-app/
+        scp -o StrictHostKeyChecking=no -i ./temp_key.pem -r ./ ${{ env.VM_USER }}@${{ env.VM_HOST }}:/home/${{ env.VM_USER }}/voting-app/
 
     # ----------------- Deploy to VM -----------------
     - name: Deploy to VM
@@ -79,7 +85,7 @@ jobs:
       with:
         host: ${{ env.VM_HOST }}
         username: ${{ env.VM_USER }}
-        key: ${{ env.SSH_KEY }}
+        key: ./temp_key.pem
         port: 22
         script: |
           cd /home/${{ env.VM_USER }}/voting-app
