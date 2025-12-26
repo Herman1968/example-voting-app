@@ -41,6 +41,9 @@ jobs:
     - name: Login to ACR
       run: az acr login --name $ACR
 
+    # ----------------- Check Docker -----------------
+    - name: Check Docker
+      run: docker --version
 
     # ----------------- Build & Push Images -----------------
     - name: Build & Push vote
