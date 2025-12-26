@@ -1,31 +1,44 @@
-name: CI-CD Voting App
+name: CI/CD Voting App
 
 on:
   push:
     branches:
       - main
+
 env:
-  ACR: ${{ secrets.ACR_LOGIN_SERVER }}
+  # Ім'я ACR з GitHub Secret
+  ACR: ${{ secrets.AZURE_ACR_NAME }}
+  # SSH доступ до VM
+  VM_HOST: ${{ secrets.VM_HOST }}
+  VM_USER: ${{ secrets.VM_USER }}
+  SSH_KEY: ${{ secrets.SSH_KEY }}
 
 jobs:
   build-push-deploy:
     runs-on: ubuntu-latest
 
     steps:
+    # ----------------- Checkout -----------------
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    # ----------------- Azure Login -----------------
     - name: Azure Login
       uses: azure/login@v2
       with:
-        client-id: ${{ secrets.AZURE_CLIENTES_ID }}
-        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-        client-secret: ${{ secrets.AZURE_CLIENTES_SECRET }}
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+    # ----------------- Login to ACR -----------------
     - name: Login to ACR
       run: az acr login --name $ACR
 
-    # ---------- BUILD & PUSH ONLY 3 SERVICES ----------
+    # ----------------- Check Docker -----------------
+    - name: Check Docker
+      run: |
+        docker --version
+        docker compose version
+
+    # ----------------- Build & Push Images -----------------
     - name: Build & Push vote
       run: |
         docker build -t $ACR/vote:latest ./vote
@@ -41,7 +54,20 @@ jobs:
         docker build -t $ACR/worker:latest ./worker
         docker push $ACR/worker:latest
 
-    # ---------- UPDATE docker-compose.yml ----------
+    # ----------------- Update docker-compose.yml -----------------
     - name: Update docker-compose.yml
       run: |
-        sed -i 's|build: ./vote|image: '"$ACR"'/v
+        sed -i 's|build: ./vote|image: '"$ACR"'/vote:latest|' docker-compose.yml
+        sed -i 's|build: ./result|image: '"$ACR"'/result:latest|' docker-compose.yml
+        sed -i 's|build: ./worker|image: '"$ACR"'/worker:latest|' docker-compose.yml
+
+    # ----------------- Deploy to VM -----------------
+    - name: Deploy to VM
+      uses: appleboy/ssh-action@v0.1.7
+      with:
+        host: ${{ env.VM_HOST }}
+        username: ${{ env.VM_USER }}
+        key: ${{ env.SSH_KEY }}
+        port: 22
+        script: |
+          cd /home/${{ env.VM_USER }}/_
