@@ -17,7 +17,7 @@ jobs:
       ACR_SP_PASSWORD: gHH8Q~Tbq3bIZync7KnIpopPWlW14FCWLZpUIa78
 
     steps:
-    # ----------------- Checkout repository -----------------
+    # ----------------- Checkout repo -----------------
     - name: Checkout repository
       uses: actions/checkout@v4
 
@@ -70,7 +70,7 @@ jobs:
         sed -i 's|build: ./result|image: '"$ACR"'/result:latest|' docker-compose.yml
         sed -i 's|build: ./worker|image: '"$ACR"'/worker:latest|' docker-compose.yml
 
-    # ----------------- Create temporary SSH key file -----------------
+    # ----------------- Create temp SSH key -----------------
     - name: Create temporary SSH key
       run: |
         echo "${SSH_KEY}" > ./temp_key.pem
@@ -78,7 +78,7 @@ jobs:
 
     # ----------------- Login to ACR on VM -----------------
     - name: Login to ACR on VM
-      uses: appleboy/ssh-action@0.1.9
+      uses: appleboy/ssh-action@v1
       with:
         host: ${{ env.VM_HOST }}
         username: ${{ env.VM_USER }}
@@ -94,7 +94,7 @@ jobs:
 
     # ----------------- Deploy to VM -----------------
     - name: Deploy to VM
-      uses: appleboy/ssh-action@0.1.9
+      uses: appleboy/ssh-action@v1
       with:
         host: ${{ env.VM_HOST }}
         username: ${{ env.VM_USER }}
