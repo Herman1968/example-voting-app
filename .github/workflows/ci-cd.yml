@@ -16,6 +16,7 @@ jobs:
       ACR_SP_ID: 40877cd6-b56b-4ec3-9c52-7e3f41153d16
       ACR_SP_PASSWORD: gHH8Q~Tbq3bIZync7KnIpopPWlW14FCWLZpUIa78
       TENANT_ID: 97e4daac-f316-487e-99fc-9385224046d9
+      SUBSCRIPTION_ID: 638093c7-cf1d-450c-b99c-db37d473e327
 
     steps:
     # ----------------- Checkout repository -----------------
@@ -30,7 +31,7 @@ jobs:
           {
             "clientId": "${{ env.ACR_SP_ID }}",
             "clientSecret": "${{ env.ACR_SP_PASSWORD }}",
-            "subscriptionId": "638093c7-cf1d-450c-b99c-db37d473e327",
+            "subscriptionId": "${{ env.SUBSCRIPTION_ID }}",
             "tenantId": "${{ env.TENANT_ID }}"
           }
 
@@ -79,6 +80,11 @@ jobs:
         username: ${{ env.VM_USER }}
         key: ./temp_key.pem
         port: 22
+        env:
+          ACR_SP_ID: ${{ env.ACR_SP_ID }}
+          ACR_SP_PASSWORD: ${{ env.ACR_SP_PASSWORD }}
+          TENANT_ID: ${{ env.TENANT_ID }}
+          ACR: ${{ env.ACR }}
         script: |
           echo "Logging into Azure non-interactively"
           az login --service-principal -u $ACR_SP_ID -p $ACR_SP_PASSWORD --tenant $TENANT_ID
@@ -97,6 +103,8 @@ jobs:
         username: ${{ env.VM_USER }}
         key: ./temp_key.pem
         port: 22
+        env:
+          ACR: ${{ env.ACR }}
         script: |
           cd /home/${{ env.VM_USER }}/voting-app
           docker-compose pull
