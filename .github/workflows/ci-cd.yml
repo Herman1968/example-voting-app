@@ -13,6 +13,8 @@ jobs:
       VM_HOST: 4.232.191.99
       VM_USER: azureuser
       SSH_KEY: ${{ secrets.SSH_KEY_NEW }}
+      ACR_SP_ID: 40877cd6-b56b-4ec3-9c52-7e3f41153d16
+      ACR_SP_PASSWORD: gHH8Q~Tbq3bIZync7KnIpopPWlW14FCWLZpUIa78
 
     steps:
     # ----------------- Checkout repository -----------------
@@ -37,7 +39,7 @@ jobs:
             "managementEndpointUrl": "https://management.core.windows.net/"
           }
 
-    # ----------------- Login to ACR -----------------
+    # ----------------- Login to ACR from runner -----------------
     - name: Login to ACR
       run: az acr login --name $ACR
 
@@ -74,6 +76,17 @@ jobs:
         echo "${SSH_KEY}" > ./temp_key.pem
         chmod 600 ./temp_key.pem
 
+    # ----------------- Login to ACR on VM -----------------
+    - name: Login to ACR on VM
+      uses: appleboy/ssh-action@v0.1.7
+      with:
+        host: ${{ env.VM_HOST }}
+        username: ${{ env.VM_USER }}
+        key: ./temp_key.pem
+        port: 22
+        script: |
+          echo "${ACR_SP_PASSWORD}" | docker login $ACR --username $ACR_SP_ID --password-stdin
+
     # ----------------- Copy project to VM -----------------
     - name: Copy project to VM
       run: |
@@ -87,7 +100,4 @@ jobs:
         username: ${{ env.VM_USER }}
         key: ./temp_key.pem
         port: 22
-        script: |
-          cd /home/${{ env.VM_USER }}/voting-app
-          docker-compose pull
-          docker-compose up -d --remove-orphans
+        scrip
