@@ -100,4 +100,7 @@ jobs:
         username: ${{ env.VM_USER }}
         key: ./temp_key.pem
         port: 22
-        scrip
+        script: |
+          cd /home/${{ env.VM_USER }}/voting-app
+          docker-compose pull
+          docker-compose up -d --remove-orphans
