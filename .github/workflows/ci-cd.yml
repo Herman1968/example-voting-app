@@ -95,7 +95,7 @@ jobs:
       run: |
         scp -o StrictHostKeyChecking=no -i ./temp_key.pem -r ./ ${{ env.VM_USER }}@${{ env.VM_HOST }}:/home/${{ env.VM_USER }}/voting-app/
 
-    # ----------------- Deploy to VM -----------------
+    # ----------------- Deploy to VM ----------------
     - name: Deploy to VM
       uses: appleboy/ssh-action@v1
       with:
