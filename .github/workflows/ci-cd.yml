@@ -44,7 +44,7 @@ jobs:
     - name: Check Docker
       run: |
         docker --version
-        docker-compose --version
+        docker compose version
 
     # ----------------- Build & Push Images -----------------
     - name: Build & Push vote
@@ -79,5 +79,5 @@ jobs:
         port: 22
         script: |
           cd /home/${{ env.VM_USER }}/voting-app
-          docker-compose pull
-          docker-compose up -d --remove-orphans
+          docker compose pull
+          docker compose up -d --remove-orphans
