@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-
 env:
   ACR: ${{ secrets.ACR_LOGIN_SERVER }}
 
