@@ -46,7 +46,7 @@ jobs:
         docker --version
         docker compose version
 
-    # ----------------- Build & Push Images -----------------
+  
     - name: Build & Push vote
       run: |
         docker build -t $ACR/vote:latest ./vote
