@@ -1,97 +1,80 @@
-name: CI/CD Voting App
+name: CI-CD Pipeline
 
 on:
   push:
     branches:
       - main
 
+env:
+  # Azure Container Registry
+  ACR: hzvonenko.azurecr.io
+  # SSH доступ к VM
+  VM_HOST: 4.232.191.99
+  VM_USER: azureuser
+  SSH_KEY: ${{ secrets.SSH_KEY_NEW }}
+  # Azure Service Principal для ACR
+  ACR_SP_ID: ${{ secrets.ACR_SP_ID }}
+  ACR_SP_PASSWORD: ${{ secrets.ACR_SP_PASSWORD }}
+
 jobs:
   build-push-deploy:
     runs-on: ubuntu-latest
-    env:
-      ACR: hzvonenko.azurecr.io
-      VM_HOST: 4.232.191.99
-      VM_USER: azureuser
-      SSH_KEY: ${{ secrets.SSH_KEY_NEW }}
-      ACR_SP_ID: 40877cd6-b56b-4ec3-9c52-7e3f41153d16
-      ACR_SP_PASSWORD: gHH8Q~Tbq3bIZync7KnIpopPWlW14FCWLZpUIa78
-      TENANT_ID: 97e4daac-f316-487e-99fc-9385224046d9
-      SUBSCRIPTION_ID: 638093c7-cf1d-450c-b99c-db37d473e327
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    # ----------------- Checkout -----------------
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          creds: |
-            {
-              "clientId": "${{ env.ACR_SP_ID }}",
-              "clientSecret": "${{ env.ACR_SP_PASSWORD }}",
-              "subscriptionId": "${{ env.SUBSCRIPTION_ID }}",
-              "tenantId": "${{ env.TENANT_ID }}"
-            }
+    # ----------------- Azure Login -----------------
+    - name: Azure Login
+      uses: azure/login@v2
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Login to ACR
-        run: az acr login --name $ACR
+    # ----------------- Login to ACR -----------------
+    - name: Login to ACR
+      run: |
+        echo "${ACR_SP_PASSWORD}" | docker login $ACR --username $ACR_SP_ID --password-stdin
 
-      - name: Check Docker
-        run: docker --version
+    # ----------------- Check Docker -----------------
+    - name: Check Docker
+      run: |
+        docker --version
+        docker compose version
 
-      - name: Build & Push vote
-        run: |
-          docker build -t $ACR/vote:latest ./vote
-          docker push $ACR/vote:latest
+    # ----------------- Build & Push Images -----------------
+    - name: Build & Push vote
+      run: |
+        docker build -t $ACR/vote:latest ./vote
+        docker push $ACR/vote:latest
 
-      - name: Build & Push result
-        run: |
-          docker build -t $ACR/result:latest ./result
-          docker push $ACR/result:latest
+    - name: Build & Push result
+      run: |
+        docker build -t $ACR/result:latest ./result
+        docker push $ACR/result:latest
 
-      - name: Build & Push worker
-        run: |
-          docker build -t $ACR/worker:latest ./worker
-          docker push $ACR/worker:latest
+    - name: Build & Push worker
+      run: |
+        docker build -t $ACR/worker:latest ./worker
+        docker push $ACR/worker:latest
 
-      - name: Update docker-compose.yml
-        run: |
-          sed -i 's|build: ./vote|image: '"$ACR"'/vote:latest|' docker-compose.yml
-          sed -i 's|build: ./result|image: '"$ACR"'/result:latest|' docker-compose.yml
-          sed -i 's|build: ./worker|image: '"$ACR"'/worker:latest|' docker-compose.yml
+    # ----------------- Copy files to VM -----------------
+    - name: Copy project to VM
+      run: |
+        # Создаем директорию на VM
+        ssh -i $SSH_KEY -o StrictHostKeyChecking=no $VM_USER@$VM_HOST "mkdir -p /home/$VM_USER/voting-app"
+        
+        # Копируем только нужные папки и файлы (без .git)
+        scp -i $SSH_KEY -o StrictHostKeyChecking=no \
+          ./docker-compose.yml \
+          -r ./vote ./result ./worker \
+          $VM_USER@$VM_HOST:/home/$VM_USER/voting-app/
 
-      - name: Create temporary SSH key
-        run: |
-          echo "${SSH_KEY}" > ./temp_key.pem
-          chmod 600 ./temp_key.pem
-
-      - name: Login to ACR on VM
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ env.VM_HOST }}
-          username: ${{ env.VM_USER }}
-          key: ./temp_key.pem
-          port: 22
-          script: |
-            echo "Logging into Azure non-interactively"
-            az login --service-principal -u ${{ env.ACR_SP_ID }} -p ${{ env.ACR_SP_PASSWORD }} --tenant ${{ env.TENANT_ID }}
-            az acr login --name ${{ env.ACR }}
-
-      - name: Copy project to VM
-        run: |
-          scp -o StrictHostKeyChecking=no -i ./temp_key.pem -r ./ ${{ env.VM_USER }}@${{ env.VM_HOST }}:/home/${{ env.VM_USER }}/voting-app/
-
-      - name: Deploy to VM
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ env.VM_HOST }}
-          username: ${{ env.VM_USER }}
-          key: ./temp_key.pem
-          port: 22
-          script: |
-            cd /home/${{ env.VM_USER }}/voting-app
-            docker-compose pull
-            docker-compose up -d --remove-orphans
-
-      - name: Remove temporary SSH key
-        run: rm -f ./temp_key.pem
+    # ----------------- Deploy on VM -----------------
+    - name: Deploy on VM
+      run: |
+        ssh -i $SSH_KEY -o StrictHostKeyChecking=no $VM_USER@$VM_HOST "
+          cd /home/$VM_USER/voting-app
+          docker compose pull
+          docker compose up -d --remove-orphans
+        "
