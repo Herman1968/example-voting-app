@@ -19,7 +19,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ---------- ACR LOGIN ----------
+      # ---------- DOCKER LOGIN ----------
       - name: Login to Azure Container Registry
         run: |
           echo "${{ secrets.ACR_PASSWORD }}" | docker login $ACR_LOGIN_SERVER -u ${{ secrets.ACR_USERNAME }} --password-stdin
@@ -57,16 +57,15 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H $VM_HOST >> ~/.ssh/known_hosts
 
-      # ---------- COPY COPOSE ----------
+      # ---------- COPY COMPOSE ----------
       - name: Copy docker-compose to VM
         run: |
-          scp docker-compose.prod.yml \
-          $VM_USER@$VM_HOST:$APP_DIR/docker-compose.yml
+          scp docker-compose.prod.yml $VM_USER@$VM_HOST:$APP_DIR/docker-compose.yml
 
       # ---------- DEPLOY ----------
       - name: Deploy on VM
         run: |
-          ssh $VM_USER@$VM_HOST << EOF
+          ssh $VM_USER@$VM_HOST << 'EOF'
             set -e
             cd $APP_DIR
             echo "${{ secrets.ACR_PASSWORD }}" | docker login $ACR_LOGIN_SERVER -u ${{ secrets.ACR_USERNAME }} --password-stdin
