@@ -24,8 +24,8 @@ jobs:
         uses: azure/docker-login@v1
         with:
           login-server: ${{ env.ACR_LOGIN_SERVER }}
-          username: ${{ secrets.ACR_USERNAME }}
-          password: ${{ secrets.ACR_PASSWORD }}
+          username: ${{ secrets.ACR_NAMES }}     # твій Secret для username
+          password: ${{ secrets.ACR_PASSWORD }}  # твій Secret для password2
 
       # ---------- BUILD & PUSH ----------
       - name: Build and Push vote
@@ -71,7 +71,7 @@ jobs:
           ssh $VM_USER@$VM_HOST << 'EOF'
             set -e
             cd $APP_DIR
-            echo "${{ secrets.ACR_PASSWORD }}" | docker login $ACR_LOGIN_SERVER -u ${{ secrets.ACR_USERNAME }} --password-stdin
+            echo "${{ secrets.ACR_PASSWORD }}" | docker login $ACR_LOGIN_SERVER -u ${{ secrets.ACR_NAMES }} --password-stdin
             docker-compose pull
             docker-compose up -d --remove-orphans
           EOF
