@@ -75,10 +75,6 @@ jobs:
             # Login to ACR
             echo "${{ secrets.ACR_PASSWORD }}" | docker login $ACR_LOGIN_SERVER -u ${{ secrets.ACR_NAMES }} --password-stdin
 
-            # Login to Docker Hub
-            echo "${{ secrets.DOCKERHUB_PASSWORDSS }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
-
-            # Pull images and deploy
-            docker-compose pull
-            docker-compose up -d --remove-orphans
+            # Deploy WITHOUT Docker Hub login
+            docker-compose up -d --remove-orphans --no-build
           EOF
