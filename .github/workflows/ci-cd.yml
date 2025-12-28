@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - main
+
 env:
   ACR_LOGIN_SERVER: hzvonenko.azurecr.io
   VM_HOST: 4.232.191.99
@@ -75,7 +76,7 @@ jobs:
             echo "${{ secrets.ACR_PASSWORD }}" | docker login $ACR_LOGIN_SERVER -u ${{ secrets.ACR_NAMES }} --password-stdin
 
             # Login to Docker Hub
-            echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+            echo "${{ secrets.DOCKERHUB_PASSWORDS }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
 
             # Pull images and deploy
             docker-compose pull
