@@ -52,13 +52,10 @@ jobs:
             -e "s|build: ./worker|image: $ACR_LOGIN_SERVER/worker:latest|" \
             docker-compose.yml > docker-compose.prod.yml
 
-      # ---------- SSH KEY ----------
-      - name: Setup SSH
+      # ---------- CREATE APP DIRECTORY ----------
+      - name: Ensure app directory exists on VM
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_KEY_NEW }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H $VM_HOST >> ~/.ssh/known_hosts
+          ssh -T $VM_USER@$VM_HOST "mkdir -p $APP_DIR"
 
       # ---------- COPY COMPOSE ----------
       - name: Copy docker-compose to VM
@@ -75,10 +72,6 @@ jobs:
             # Login to ACR
             echo "${{ secrets.ACR_PASSWORD }}" | docker login $ACR_LOGIN_SERVER -u ${{ secrets.ACR_NAMES }} --password-stdin
 
-            # Login to Docker Hub via PAT
-            echo "${{ secrets.DOCKERHUB_PASSWORDSS }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
-
-            # Pull all images and deploy
-            docker-compose pull
-            docker-compose up -d --remove-orphans
+            # Deploy all services (no pull from Docker Hub)
+            docker-compose up -d --remove-orphans --no-build
           EOF
