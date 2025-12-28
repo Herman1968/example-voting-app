@@ -57,6 +57,7 @@ jobs:
           echo "${{ secrets.SSH_KEY_NEW }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H $VM_HOST >> ~/.ssh/known_hosts
+
       # ---------- COPY COMPOSE ----------
       - name: Copy docker-compose to VM
         run: |
@@ -68,6 +69,9 @@ jobs:
           ssh $VM_USER@$VM_HOST << 'EOF'
             set -e
             cd /home/azureuser/voting-app
+            # Логін в ACR для vote/result/worker
+            docker login hzvonenko.azurecr.io -u ${{ secrets.ACR_NAMES }} -p ${{ secrets.ACR_PASSWORD2 }}
+            # Логін в Docker Hub для redis/postgres
             docker login -u herman1968 -p ${{ secrets.DOCKERHUB_PASSWORDSS }}
             docker-compose -f docker-compose.yml up -d --remove-orphans --no-build
           EOF
