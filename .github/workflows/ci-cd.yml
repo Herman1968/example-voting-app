@@ -28,7 +28,7 @@ jobs:
       # ---------- ACR LOGIN ----------
       - name: Login to Azure Container Registry
         run: |
-          az acr login --name ${ACR_LOGIN_SERVER%%.*}
+          echo "${{ secrets.ACR_SECRET }}" | docker login $ACR_LOGIN_SERVER -u $ACR_LOGIN_SERVER --password-stdin
 
       # ---------- BUILD & PUSH ----------
       - name: Build and Push vote
@@ -72,12 +72,10 @@ jobs:
       # ---------- DEPLOY ----------
       - name: Deploy on VM
         run: |
-          ssh $VM_USER@$VM_HOST << 'EOF'
+          ssh $VM_USER@$VM_HOST << EOF
             set -e
-            cd /home/azureuser/voting-app
-            docker login hzvonenko.azurecr.io \
-              -u ${{ secrets.ACR_SP_ID }} \
-              -p ${{ secrets.ACR_SP_PASSWORD }}
+            cd $APP_DIR
+            echo "${{ secrets.ACR_SECRET }}" | docker login $ACR_LOGIN_SERVER -u $ACR_LOGIN_SERVER --password-stdin
             docker-compose pull
             docker-compose up -d --remove-orphans
           EOF
