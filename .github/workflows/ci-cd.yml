@@ -57,7 +57,6 @@ jobs:
           echo "${{ secrets.SSH_KEY_NEW }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H $VM_HOST >> ~/.ssh/known_hosts
-
       # ---------- COPY COMPOSE ----------
       - name: Copy docker-compose to VM
         run: |
