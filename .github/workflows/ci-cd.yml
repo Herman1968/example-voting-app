@@ -68,7 +68,7 @@ jobs:
       # ---------- DEPLOY ----------
       - name: Deploy on VM
         run: |
-          ssh -T $VM_USER@$VM_HOST << 'EOF'
+          ssh -T $VM_USER@$VM_HOST << "EOF"
             set -e
             cd $APP_DIR
 
