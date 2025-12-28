@@ -57,7 +57,7 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H $VM_HOST >> ~/.ssh/known_hosts
 
-      # ---------- COPY COMPOSE ----------
+      # ---------- COPY COPOSE ----------
       - name: Copy docker-compose to VM
         run: |
           scp docker-compose.prod.yml \
