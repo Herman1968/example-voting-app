@@ -1,4 +1,5 @@
 name: CI-CD Voting App
+
 on:
   push:
     branches:
@@ -21,11 +22,8 @@ jobs:
 
       # ---------- ACR LOGIN ----------
       - name: Login to Azure Container Registry
-        uses: azure/docker-login@v1
-        with:
-          login-server: ${{ env.ACR_LOGIN_SERVER }}
-          username: ${{ secrets.ACR_NAMES }}
-          password: ${{ secrets.ACR_PASSWORD }}
+        run: |
+          echo "${{ secrets.ACR_PASSWORD2 }}" | docker login $ACR_LOGIN_SERVER -u ${{ secrets.ACR_NAMES }} --password-stdin
 
       # ---------- BUILD & PUSH ----------
       - name: Build and Push vote
@@ -50,23 +48,27 @@ jobs:
             -e "s|build: ./vote|image: $ACR_LOGIN_SERVER/vote:latest|" \
             -e "s|build: ./result|image: $ACR_LOGIN_SERVER/result:latest|" \
             -e "s|build: ./worker|image: $ACR_LOGIN_SERVER/worker:latest|" \
-            docker-compose.yml > docker-compose.prod.yml
+            docker-compose.prod.yml > docker-compose.prod.tmp.yml
 
-      # ---------- SSH SETUP & COPY COMPOSE ----------
-      - name: Setup SSH and copy compose
+      # ---------- SETUP SSH ----------
+      - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_KEY_NEW }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H $VM_HOST >> ~/.ssh/known_hosts
-          ssh -T $VM_USER@$VM_HOST "mkdir -p $APP_DIR"
-          scp docker-compose.prod.yml $VM_USER@$VM_HOST:$APP_DIR/docker-compose.yml
+
+      # ---------- COPY COMPOSE ----------
+      - name: Copy docker-compose to VM
+        run: |
+          scp docker-compose.prod.tmp.yml $VM_USER@$VM_HOST:$APP_DIR/docker-compose.yml
 
       # ---------- DEPLOY ----------
       - name: Deploy on VM
         run: |
-          ssh -T $VM_USER@$VM_HOST << "EOF"
+          ssh $VM_USER@$VM_HOST << 'EOF'
             set -e
-            echo "${{ secrets.ACR_PASSWORD }}" | docker login $ACR_LOGIN_SERVER -u ${{ secrets.ACR_NAMES }} --password-stdin
-            docker-compose -f $APP_DIR/docker-compose.yml up -d --remove-orphans --no-build
+            cd /home/azureuser/voting-app
+            docker login -u herman1968 -p ${{ secrets.DOCKERHUB_PASSWORDSS }}
+            docker-compose -f docker-compose.yml up -d --remove-orphans --no-build
           EOF
