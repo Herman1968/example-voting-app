@@ -1,4 +1,4 @@
-name: CI/CD Pipeline
+name: CI-CD Voting App
 
 on:
   push:
@@ -6,60 +6,79 @@ on:
       - main
 
 env:
-  # Имя ACR из GitHub Secret
-  ACR: ${{ secrets.AZURE_ACR_NAME }}
-  # SSH доступ до VM
-  VM_HOST: ${{ secrets.VM_HOST }}
-  VM_USER: ${{ secrets.VM_USER }}
-  SSH_KEY: ${{ secrets.SSH_KEY_NEW }}
-  # Сервисный принципал ACR
-  ACR_SP_ID: ${{ secrets.ACR_SP_ID }}
-  ACR_SP_PASSWORD: ${{ secrets.ACR_SP_PASSWORD }}
+  ACR_LOGIN_SERVER: hzvonenko.azurecr.io
+  VM_HOST: 4.232.191.99
+  VM_USER: azureuser
+  APP_DIR: /home/azureuser/voting-app
 
 jobs:
-  build-push-deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-    # ----------------- Checkout -----------------
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      # ---------- CHECKOUT ----------
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    # ----------------- Azure Login -----------------
-    - name: Azure Login
-      uses: azure/login@v2
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALSS }}
+      # ---------- AZURE LOGIN ----------
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALSS }}
 
-    # ----------------- Login to ACR -----------------
-    - name: Login to ACR
-      run: echo "${ACR_SP_PASSWORD}" | docker login $ACR --username $ACR_SP_ID --password-stdin
+      # ---------- ACR LOGIN ----------
+      - name: Login to Azure Container Registry
+        run: |
+          az acr login --name ${ACR_LOGIN_SERVER%%.*}
 
-    # ----------------- Build & Push Images -----------------
-    - name: Build & Push vote
-      run: |
-        docker build -t $ACR/vote:latest ./vote
-        docker push $ACR/vote:latest
+      # ---------- BUILD & PUSH ----------
+      - name: Build and Push vote
+        run: |
+          docker build -t $ACR_LOGIN_SERVER/vote:latest ./vote
+          docker push $ACR_LOGIN_SERVER/vote:latest
 
-    - name: Build & Push result
-      run: |
-        docker build -t $ACR/result:latest ./result
-        docker push $ACR/result:latest
+      - name: Build and Push result
+        run: |
+          docker build -t $ACR_LOGIN_SERVER/result:latest ./result
+          docker push $ACR_LOGIN_SERVER/result:latest
 
-    - name: Build & Push worker
-      run: |
-        docker build -t $ACR/worker:latest ./worker
-        docker push $ACR/worker:latest
+      - name: Build and Push worker
+        run: |
+          docker build -t $ACR_LOGIN_SERVER/worker:latest ./worker
+          docker push $ACR_LOGIN_SERVER/worker:latest
 
-    # ----------------- Deploy to VM -----------------
-    - name: Deploy to VM
-      uses: appleboy/ssh-action@v1
-      with:
-        host: ${{ env.VM_HOST }}
-        username: ${{ env.VM_USER }}
-        key: ${{ env.SSH_KEY }}
-        port: 22
-        script: |
-          cd /home/${{ env.VM_USER }}/voting-app
-          docker compose pull
-          docker compose up -d --remove-orphans
+      # ---------- PREPARE COMPOSE ----------
+      - name: Prepare docker-compose for production
+        run: |
+          sed \
+            -e "s|build: ./vote|image: $ACR_LOGIN_SERVER/vote:latest|" \
+            -e "s|build: ./result|image: $ACR_LOGIN_SERVER/result:latest|" \
+            -e "s|build: ./worker|image: $ACR_LOGIN_SERVER/worker:latest|" \
+            docker-compose.yml > docker-compose.prod.yml
+
+      # ---------- SSH KEY ----------
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY_NEW }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H $VM_HOST >> ~/.ssh/known_hosts
+
+      # ---------- COPY COMPOSE ----------
+      - name: Copy docker-compose to VM
+        run: |
+          scp docker-compose.prod.yml \
+          $VM_USER@$VM_HOST:$APP_DIR/docker-compose.yml
+
+      # ---------- DEPLOY ----------
+      - name: Deploy on VM
+        run: |
+          ssh $VM_USER@$VM_HOST << 'EOF'
+            set -e
+            cd /home/azureuser/voting-app
+            docker login hzvonenko.azurecr.io \
+              -u ${{ secrets.ACR_SP_ID }} \
+              -p ${{ secrets.ACR_SP_PASSWORD }}
+            docker-compose pull
+            docker-compose up -d --remove-orphans
+          EOF
